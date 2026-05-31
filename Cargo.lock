@@ -96,8 +96,10 @@ checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
 name = "cargo_smi"
 version = "0.1.0"
 dependencies = [
+ "crossterm",
  "nvml-wrapper",
  "ratatui",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
