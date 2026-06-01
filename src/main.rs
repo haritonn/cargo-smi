@@ -1,13 +1,14 @@
 mod app;
 mod error;
 mod parser;
+mod ui;
 
 use crate::{
-    app::{AppState, run},
+    app::AppState,
     error::{CargoSmiError, Result},
     parser::get_available_gpus,
 };
-use std::{env::args, io::stdin};
+use std::{env::args, time::Duration};
 
 fn main() {
     if let Err(err) = run_main() {
@@ -29,19 +30,8 @@ fn run_main() -> Result<()> {
     if gpus.is_empty() {
         return Err(CargoSmiError::NoGpuFound);
     }
-    gpus.iter()
-        .for_each(|gpu| println!("{}: {}", gpu.idx, gpu.name));
 
-    let mut choice_string = String::new();
-    println!("Enter your choice: ");
-    stdin().read_line(&mut choice_string)?;
-
-    let choice_arg = choice_string.trim();
-    let choice: usize = choice_arg.parse().map_err(|_| CargoSmiError::CliArg {
-        arg: choice_arg.to_owned(),
-    })?;
-    let mut state = AppState::new(gpus);
-    state.select_gpu(choice);
-    run(&mut state, sleep_secs)?;
+    let mut state = AppState::new(gpus, Duration::from_secs(sleep_secs));
+    crate::ui::run_tui(&mut state)?;
     Ok(())
 }
