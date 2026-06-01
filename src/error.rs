@@ -1,11 +1,23 @@
-use std::process::ExitStatus;
+use std::{num::ParseIntError, process::ExitStatus};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, CargoSmiError>;
 
 #[derive(Debug, Error)]
 pub enum CargoSmiError {
-    #[error("failed to start nvidia-smi: {0}")]
+    #[error("CLI error occured: {arg}")]
+    CliArg { arg: String },
+
+    #[error("No GPU found at all")]
+    NoGpuFound,
+
+    #[error("No GPU selected")]
+    NoGpuSelected,
+
+    #[error("GPU with index {idx} not found")]
+    GpuNotFound { idx: usize },
+
+    #[error("Failed to start nvidia-smi: {0}")]
     Command(#[from] std::io::Error),
 
     #[error("nvidia-smi failed with status {status}: {stderr}")]
@@ -14,11 +26,16 @@ pub enum CargoSmiError {
     #[error("nvidia-smi output is not valid UTF-8: {0}")]
     Utf8(#[from] std::string::FromUtf8Error),
 
-    #[error("failed to parse numeric value from nvidia-smi output: {0}")]
-    ParseInt(#[from] std::num::ParseIntError),
+    #[error("Failed to parse field `{field}` from value {value:?}: {source}")]
+    ParseNumber {
+        field: &'static str,
+        value: String,
+        #[source]
+        source: ParseIntError,
+    },
 
     #[error(
-        "unexpected nvidia-smi output: expected at least {expected} columns, got {got}: {raw:?}"
+        "Unexpected nvidia-smi output: expected at least {expected} columns, got {got}: {raw:?}"
     )]
     InvalidOutput {
         expected: usize,

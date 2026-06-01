@@ -1,6 +1,8 @@
 use crate::error::{CargoSmiError, Result};
 use std::fmt::Display;
+use std::num::ParseIntError;
 use std::process::{Command, Output};
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct GpuDevice {
@@ -73,10 +75,10 @@ impl GpuDevice {
         }
 
         Ok(GpuStats::new(
-            res_items[0].parse::<i16>()?,
-            res_items[1].parse::<u8>()?,
-            res_items[2].parse::<u32>()?,
-            res_items[3].parse::<u32>()?,
+            parse_number("temperature", res_items[0])?,
+            parse_number("utilization", res_items[1])?,
+            parse_number("memory_used", res_items[2])?,
+            parse_number("memory_total", res_items[3])?,
         ))
     }
 
@@ -110,7 +112,7 @@ pub fn get_available_gpus() -> Result<Vec<GpuDevice>> {
             }
 
             Ok(GpuDevice::new(
-                items[0].parse::<usize>()?,
+                parse_number("gpu_index", items[0])?,
                 items[1].to_owned(),
             ))
         })
@@ -125,4 +127,17 @@ fn validate_cmd(cmd_res: Output) -> Result<String> {
         });
     }
     Ok(String::from_utf8(cmd_res.stdout)?)
+}
+
+fn parse_number<T>(field: &'static str, value: &str) -> Result<T>
+where
+    T: FromStr<Err = ParseIntError>,
+{
+    value
+        .parse::<T>()
+        .map_err(|source| CargoSmiError::ParseNumber {
+            field,
+            value: value.to_owned(),
+            source,
+        })
 }
