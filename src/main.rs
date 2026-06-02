@@ -1,12 +1,13 @@
 mod app;
 mod error;
-mod parser;
+mod gpu;
+mod system;
 mod ui;
 
 use crate::{
     app::AppState,
     error::{CargoSmiError, Result},
-    parser::get_available_gpus,
+    gpu::get_available_gpus,
 };
 use std::{env::args, time::Duration};
 

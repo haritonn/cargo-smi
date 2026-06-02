@@ -1,6 +1,7 @@
 use crate::{
     error,
-    parser::{GpuDevice, GpuEntry},
+    gpu::{GpuDevice, GpuEntry},
+    system::{SystemMonitor, SystemStats},
 };
 use std::{
     collections::HashMap,
@@ -15,6 +16,8 @@ pub struct AppState {
     last_error: Option<String>,
     interval: Duration,
     last_update: Instant,
+    system_monitor: SystemMonitor,
+    system_stats: Option<SystemStats>,
 }
 
 impl AppState {
@@ -33,6 +36,8 @@ impl AppState {
             last_error: None,
             interval,
             last_update: Instant::now(),
+            system_monitor: SystemMonitor::default(),
+            system_stats: None,
         }
     }
 
@@ -102,12 +107,31 @@ impl AppState {
             .ok_or(error::CargoSmiError::GpuNotFound { idx })
     }
 
+    pub fn selected_gpu(&self) -> error::Result<&GpuEntry> {
+        let idx = self.selected_idx()?;
+        self.gpus
+            .get(&idx)
+            .ok_or(error::CargoSmiError::GpuNotFound { idx })
+    }
+
     pub fn refresh_selected(&mut self) {
         match self.selected_gpu_mut().and_then(GpuEntry::refresh_stats) {
             Ok(()) => self.last_error = None,
             Err(err) => self.last_error = Some(err.to_string()),
         }
         self.last_update = Instant::now();
+    }
+
+    pub fn refresh_system(&mut self) {
+        self.system_stats = Some(self.system_monitor.refresh());
+    }
+    pub fn system_stats(&self) -> Option<&SystemStats> {
+        self.system_stats.as_ref()
+    }
+
+    pub fn refresh_all(&mut self) {
+        self.refresh_selected();
+        self.refresh_system();
     }
 
     pub fn should_refresh(&self) -> bool {
