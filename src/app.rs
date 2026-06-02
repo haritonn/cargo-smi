@@ -1,6 +1,6 @@
 use crate::{
     error,
-    gpu::{GpuDevice, GpuEntry},
+    gpu::{GpuDevice, GpuEntry, GpuMonitor},
     system::{SystemMonitor, SystemStats},
 };
 use std::{
@@ -18,10 +18,11 @@ pub struct AppState {
     last_update: Instant,
     system_monitor: SystemMonitor,
     system_stats: Option<SystemStats>,
+    gpu_monitor: GpuMonitor,
 }
 
 impl AppState {
-    pub fn new(gpus: Vec<GpuDevice>, interval: Duration) -> Self {
+    pub fn new(gpus: Vec<GpuDevice>, gpu_monitor: GpuMonitor, interval: Duration) -> Self {
         let gpu_order: Vec<usize> = gpus.iter().map(|gpu| gpu.idx).collect();
         let selected_pos = if gpu_order.is_empty() { None } else { Some(0) };
 
@@ -38,6 +39,7 @@ impl AppState {
             last_update: Instant::now(),
             system_monitor: SystemMonitor::default(),
             system_stats: None,
+            gpu_monitor,
         }
     }
 
@@ -100,6 +102,7 @@ impl AppState {
             .ok_or(error::CargoSmiError::NoGpuSelected)
     }
 
+    #[allow(unused)]
     pub fn selected_gpu_mut(&mut self) -> error::Result<&mut GpuEntry> {
         let idx = self.selected_idx()?;
         self.gpus
@@ -115,8 +118,19 @@ impl AppState {
     }
 
     pub fn refresh_selected(&mut self) {
-        match self.selected_gpu_mut().and_then(GpuEntry::refresh_stats) {
-            Ok(()) => self.last_error = None,
+        let refresh_result = self
+            .selected_idx()
+            .and_then(|idx| self.gpu_monitor.get_info(idx).map(|stats| (idx, stats)));
+
+        match refresh_result {
+            Ok((idx, stats)) => {
+                if let Some(gpu) = self.gpus.get_mut(&idx) {
+                    gpu.stats = Some(stats);
+                    self.last_error = None;
+                } else {
+                    self.last_error = Some(error::CargoSmiError::GpuNotFound { idx }.to_string());
+                }
+            }
             Err(err) => self.last_error = Some(err.to_string()),
         }
         self.last_update = Instant::now();

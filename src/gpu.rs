@@ -1,8 +1,6 @@
-use crate::error::{CargoSmiError, Result};
+use crate::error::Result;
+use nvml_wrapper::{Nvml, enum_wrappers::device::TemperatureSensor};
 use std::fmt::Display;
-use std::num::ParseIntError;
-use std::process::{Command, Output};
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct GpuDevice {
@@ -12,10 +10,10 @@ pub struct GpuDevice {
 
 #[derive(Debug)]
 pub struct GpuStats {
-    temperature: i16,
-    utilization: u8,
-    memory_used: u32,
-    memory_total: u32,
+    temperature: u32,
+    utilization: u32,
+    memory_used: u64,
+    memory_total: u64,
 }
 
 #[derive(Debug)]
@@ -24,8 +22,12 @@ pub struct GpuEntry {
     pub stats: Option<GpuStats>,
 }
 
+pub struct GpuMonitor {
+    nvml: Nvml,
+}
+
 impl GpuStats {
-    fn new(temperature: i16, utilization: u8, memory_used: u32, memory_total: u32) -> Self {
+    fn new(temperature: u32, utilization: u32, memory_used: u64, memory_total: u64) -> Self {
         Self {
             temperature,
             utilization,
@@ -53,8 +55,9 @@ impl GpuEntry {
         }
     }
 
-    pub fn refresh_stats(&mut self) -> Result<()> {
-        self.stats = Some(self.device.get_info()?);
+    #[allow(unused)]
+    pub fn refresh_stats(&mut self, gpu_monitor: &GpuMonitor) -> Result<()> {
+        self.stats = Some(gpu_monitor.get_info(self.device.idx)?);
         Ok(())
     }
 }
@@ -63,81 +66,37 @@ impl GpuDevice {
     fn new(idx: usize, name: String) -> Self {
         Self { name, idx }
     }
+}
 
-    fn parse_stats(&self, stdout_string: &str) -> Result<GpuStats> {
-        let res_items: Vec<&str> = stdout_string.trim().split(',').map(str::trim).collect();
-        if res_items.len() < 4 {
-            return Err(CargoSmiError::invalid_output_len(
-                4,
-                res_items.len(),
-                stdout_string,
-            ));
+impl GpuMonitor {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            nvml: Nvml::init()?,
+        })
+    }
+
+    pub fn get_available_gpus(&self) -> Result<Vec<GpuDevice>> {
+        let device_count = self.nvml.device_count()? as usize;
+        let mut gpus = Vec::with_capacity(device_count);
+
+        for idx in 0..device_count {
+            let device = self.nvml.device_by_index(idx as u32)?;
+            gpus.push(GpuDevice::new(idx, device.name()?));
         }
 
+        Ok(gpus)
+    }
+
+    pub fn get_info(&self, idx: usize) -> Result<GpuStats> {
+        let device = self.nvml.device_by_index(idx as u32)?;
+        let memory = device.memory_info()?;
+        let utilization = device.utilization_rates()?;
+
         Ok(GpuStats::new(
-            parse_number("temperature", res_items[0])?,
-            parse_number("utilization", res_items[1])?,
-            parse_number("memory_used", res_items[2])?,
-            parse_number("memory_total", res_items[3])?,
+            device.temperature(TemperatureSensor::Gpu)?,
+            utilization.gpu,
+            memory.used / 1024 / 1024,
+            memory.total / 1024 / 1024,
         ))
     }
-
-    pub fn get_info(&self) -> Result<GpuStats> {
-        let cmd_res = Command::new("nvidia-smi")
-            .args([
-                "-i",
-                &self.idx.to_string(),
-                "--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total",
-                "--format=csv,noheader,nounits",
-            ])
-            .output()?;
-
-        let stdout_string = validate_cmd(cmd_res)?;
-        self.parse_stats(&stdout_string)
-    }
-}
-
-pub fn get_available_gpus() -> Result<Vec<GpuDevice>> {
-    let cmd_res = Command::new("nvidia-smi")
-        .args(["--query-gpu=index,name", "--format=csv,noheader,nounits"])
-        .output()?;
-    let stdout_string = validate_cmd(cmd_res)?;
-
-    stdout_string
-        .lines()
-        .map(|line| {
-            let items: Vec<&str> = line.splitn(2, ',').map(str::trim).collect();
-            if items.len() < 2 {
-                return Err(CargoSmiError::invalid_output_len(2, items.len(), line));
-            }
-
-            Ok(GpuDevice::new(
-                parse_number("gpu_index", items[0])?,
-                items[1].to_owned(),
-            ))
-        })
-        .collect()
-}
-
-fn validate_cmd(cmd_res: Output) -> Result<String> {
-    if !cmd_res.status.success() {
-        return Err(CargoSmiError::NvidiaSmiFailed {
-            status: cmd_res.status,
-            stderr: String::from_utf8_lossy(&cmd_res.stderr).into_owned(),
-        });
-    }
-    Ok(String::from_utf8(cmd_res.stdout)?)
-}
-
-fn parse_number<T>(field: &'static str, value: &str) -> Result<T>
-where
-    T: FromStr<Err = ParseIntError>,
-{
-    value
-        .parse::<T>()
-        .map_err(|source| CargoSmiError::ParseNumber {
-            field,
-            value: value.to_owned(),
-            source,
-        })
 }

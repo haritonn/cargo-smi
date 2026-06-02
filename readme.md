@@ -1,12 +1,28 @@
 # cargo-smi
 
-Terminal GPU and system monitor written in Rust.
+<p align="center">
+  <img src="assets/app.png" alt="cargo-smi TUI dashboard" width="900">
+</p>
 
-`cargo-smi` shows NVIDIA GPU stats together with basic system information in a single TUI dashboard.
+<p align="center">
+  <strong>A fast terminal dashboard for NVIDIA GPU and system monitoring.</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.rust-lang.org/">Rust</a> ·
+  <a href="https://github.com/ratatui/ratatui">Ratatui</a> ·
+  <a href="https://docs.rs/nvml-wrapper">NVML</a>
+</p>
+
+---
+
+`cargo-smi` is a lightweight TUI monitor that shows NVIDIA GPU metrics together with basic system information in one clean terminal dashboard.
+
+Unlike shelling out to `nvidia-smi`, GPU data is collected directly through NVIDIA Management Library using [`nvml-wrapper`](https://docs.rs/nvml-wrapper), which keeps refreshes fast and avoids parsing command output.
 
 ## Features
 
-- NVIDIA GPU detection via `nvidia-smi`
+- Direct NVIDIA GPU detection via NVML
 - Live GPU stats:
   - temperature
   - utilization
@@ -24,11 +40,13 @@ Terminal GPU and system monitor written in Rust.
 
 - Rust
 - NVIDIA GPU
-- NVIDIA driver with `nvidia-smi` available in `$PATH`
+- NVIDIA driver with NVML available
+
+On most Linux systems with the proprietary NVIDIA driver installed, NVML is available as `libnvidia-ml.so`.
 
 ## Installation
 
-From source:
+Clone and build from source:
 
 ```bash
 git clone https://github.com/haritonn/cargo-smi
@@ -42,14 +60,33 @@ Run:
 cargo run --release
 ```
 
-Or with custom refresh interval in seconds:
+Run with a custom refresh interval in seconds:
 
 ```bash
 cargo run --release -- 2
 ```
+
+Or execute the built binary directly:
+
+```bash
+./target/release/cargo_smi
+```
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| `←` / `h` | Previous GPU |
+| `→` / `l` | Next GPU |
+| `q` / `Esc` | Quit |
+
 ## Known limitations
 
 - NVIDIA-only for now
-- Requires nvidia-smi
+- Requires NVIDIA driver / NVML
 - Process list is sorted by CPU usage
 - First CPU readings may need one refresh cycle to stabilize
+
+## License
+
+MIT

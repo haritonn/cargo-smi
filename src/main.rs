@@ -7,7 +7,7 @@ mod ui;
 use crate::{
     app::AppState,
     error::{CargoSmiError, Result},
-    gpu::get_available_gpus,
+    gpu::GpuMonitor,
 };
 use std::{env::args, time::Duration};
 
@@ -27,12 +27,13 @@ fn run_main() -> Result<()> {
             arg: sleep_arg.clone(),
         })?;
 
-    let gpus = get_available_gpus()?;
+    let gpu_monitor = GpuMonitor::new()?;
+    let gpus = gpu_monitor.get_available_gpus()?;
     if gpus.is_empty() {
         return Err(CargoSmiError::NoGpuFound);
     }
 
-    let mut state = AppState::new(gpus, Duration::from_secs(sleep_secs));
+    let mut state = AppState::new(gpus, gpu_monitor, Duration::from_secs(sleep_secs));
     crate::ui::run_tui(&mut state)?;
     Ok(())
 }
