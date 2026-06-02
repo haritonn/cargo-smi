@@ -7,13 +7,6 @@
 <p align="center">
   <strong>A fast terminal dashboard for NVIDIA GPU and system monitoring.</strong>
 </p>
-
-<p align="center">
-  <a href="https://www.rust-lang.org/">Rust</a> ·
-  <a href="https://github.com/ratatui/ratatui">Ratatui</a> ·
-  <a href="https://docs.rs/nvml-wrapper">NVML</a>
-</p>
-
 ---
 
 `cargo-smi` is a lightweight TUI monitor that shows NVIDIA GPU metrics together with basic system information in one clean terminal dashboard.
@@ -66,27 +59,9 @@ Run with a custom refresh interval in seconds:
 cargo run --release -- 2
 ```
 
-Or execute the built binary directly:
-
-```bash
-./target/release/cargo_smi
-```
-
-## Controls
-
-| Key | Action |
-| --- | --- |
-| `←` / `h` | Previous GPU |
-| `→` / `l` | Next GPU |
-| `q` / `Esc` | Quit |
-
 ## Known limitations
 
 - NVIDIA-only for now
 - Requires NVIDIA driver / NVML
 - Process list is sorted by CPU usage
 - First CPU readings may need one refresh cycle to stabilize
-
-## License
-
-MIT
