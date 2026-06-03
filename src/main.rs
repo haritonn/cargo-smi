@@ -33,7 +33,7 @@ fn run_main() -> Result<()> {
         return Err(CargoSmiError::NoGpuFound);
     }
 
-    let mut state = AppState::new(gpus, gpu_monitor, Duration::from_secs(sleep_secs));
+    let mut state = AppState::new(gpus, gpu_monitor, Duration::from_secs(sleep_secs))?;
     crate::ui::run_tui(&mut state)?;
     Ok(())
 }

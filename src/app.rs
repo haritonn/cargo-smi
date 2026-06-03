@@ -19,14 +19,20 @@ pub struct AppState {
     system_monitor: SystemMonitor,
     system_stats: Option<SystemStats>,
     gpu_monitor: GpuMonitor,
+    cuda_version: String,
 }
 
 impl AppState {
-    pub fn new(gpus: Vec<GpuDevice>, gpu_monitor: GpuMonitor, interval: Duration) -> Self {
+    pub fn new(
+        gpus: Vec<GpuDevice>,
+        gpu_monitor: GpuMonitor,
+        interval: Duration,
+    ) -> error::Result<Self> {
         let gpu_order: Vec<usize> = gpus.iter().map(|gpu| gpu.idx).collect();
         let selected_pos = if gpu_order.is_empty() { None } else { Some(0) };
+        let cuda_version = gpu_monitor.cuda_driver_version()?;
 
-        Self {
+        Ok(Self {
             gpus: gpus
                 .into_iter()
                 .map(|gpu| (gpu.idx, GpuEntry::new(gpu)))
@@ -40,19 +46,8 @@ impl AppState {
             system_monitor: SystemMonitor::default(),
             system_stats: None,
             gpu_monitor,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn select_gpu(&mut self, idx: usize) -> error::Result<()> {
-        let pos = self
-            .gpu_order
-            .iter()
-            .position(|gpu_idx| *gpu_idx == idx)
-            .ok_or(error::CargoSmiError::GpuNotFound { idx })?;
-
-        self.selected_pos = Some(pos);
-        Ok(())
+            cuda_version,
+        })
     }
 
     pub fn select_next(&mut self) {
@@ -141,6 +136,10 @@ impl AppState {
     }
     pub fn system_stats(&self) -> Option<&SystemStats> {
         self.system_stats.as_ref()
+    }
+
+    pub fn cuda_version(&self) -> &str {
+        &self.cuda_version
     }
 
     pub fn refresh_all(&mut self) {

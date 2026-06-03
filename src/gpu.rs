@@ -1,5 +1,8 @@
 use crate::error::Result;
-use nvml_wrapper::{Nvml, enum_wrappers::device::TemperatureSensor};
+use nvml_wrapper::{
+    Nvml, cuda_driver_version_major, cuda_driver_version_minor,
+    enum_wrappers::device::TemperatureSensor,
+};
 use std::fmt::Display;
 
 #[derive(Debug)]
@@ -75,6 +78,17 @@ impl GpuMonitor {
         })
     }
 
+    pub fn cuda_driver_version(&self) -> Result<String> {
+        let version = self.nvml.sys_cuda_driver_version()?;
+        let driver = self.nvml.sys_driver_version()?;
+        Ok(format!(
+            "{}.{} | Driver version: {}",
+            cuda_driver_version_major(version),
+            cuda_driver_version_minor(version),
+            driver,
+        ))
+    }
+
     pub fn get_available_gpus(&self) -> Result<Vec<GpuDevice>> {
         let device_count = self.nvml.device_count()? as usize;
         let mut gpus = Vec::with_capacity(device_count);
@@ -98,5 +112,9 @@ impl GpuMonitor {
             memory.used / 1024 / 1024,
             memory.total / 1024 / 1024,
         ))
+    }
+
+    fn get_gpu_processes(&self) {
+        unimplemented!()
     }
 }

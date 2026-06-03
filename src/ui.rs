@@ -54,7 +54,11 @@ fn run_tui_loop(
                     Constraint::Length(3),
                 ])
                 .split(area);
-            let header = Paragraph::new("cargo-smi").block(
+            let header = Paragraph::new(format!(
+                "cargo-smi | CUDA version: {}",
+                state.cuda_version()
+            ))
+            .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Magenta)),
