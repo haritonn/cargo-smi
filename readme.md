@@ -7,11 +7,12 @@
 <p align="center">
   <strong>A fast terminal dashboard for NVIDIA GPU and system monitoring.</strong>
 </p>
+
 ---
 
-`cargo-smi` is a lightweight TUI monitor that shows NVIDIA GPU metrics together with basic system information in one clean terminal dashboard.
+`cargo-smi` is a lightweight TUI monitor that shows NVIDIA GPU metrics, GPU processes, and basic system information in one terminal dashboard.
 
-Unlike shelling out to `nvidia-smi`, GPU data is collected directly through NVIDIA Management Library using [`nvml-wrapper`](https://docs.rs/nvml-wrapper), which keeps refreshes fast and avoids parsing command output.
+Unlike shelling out to `nvidia-smi`, GPU data is collected directly through NVIDIA Management Library using [`nvml-wrapper`](https://docs.rs/nvml-wrapper), avoiding command output parsing.
 
 ## Features
 
@@ -20,14 +21,20 @@ Unlike shelling out to `nvidia-smi`, GPU data is collected directly through NVID
   - temperature
   - utilization
   - memory usage
+- GPU process list:
+  - PID
+  - process name
+  - used GPU memory
+  - compute / graphics process kind
 - Multiple GPU navigation
+- CUDA driver version and NVIDIA driver version display
 - System overview:
   - CPU usage
   - RAM usage
   - swap usage
   - top processes by CPU usage
 - Keyboard-driven terminal UI
-- Configurable refresh interval
+- Configurable refresh interval in milliseconds
 
 ## Requirements
 
@@ -43,25 +50,45 @@ Clone and build from source:
 
 ```bash
 git clone https://github.com/haritonn/cargo-smi
-cd cargo_smi
+cd cargo-smi
 cargo build --release
 ```
 
-Run:
+Run from source:
 
 ```bash
 cargo run --release
 ```
 
-Run with a custom refresh interval in seconds:
+Install locally with Cargo:
 
 ```bash
-cargo run --release -- 2
+cargo install --path .
+```
+
+Then run:
+
+```bash
+cargo_smi
+```
+
+## Usage
+
+Run with default refresh interval:
+
+```bash
+cargo run --release
+```
+
+Run with a custom refresh interval in milliseconds:
+
+```bash
+cargo run --release -- 500
 ```
 
 ## Known limitations
 
 - NVIDIA-only for now
 - Requires NVIDIA driver / NVML
-- Process list is sorted by CPU usage
+- GPU process utilization percentage is not shown
 - First CPU readings may need one refresh cycle to stabilize

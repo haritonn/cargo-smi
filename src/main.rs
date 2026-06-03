@@ -1,3 +1,5 @@
+//! Entry point for the cargo-smi terminal application.
+
 mod app;
 mod error;
 mod gpu;
@@ -11,6 +13,7 @@ use crate::{
 };
 use std::{env::args, time::Duration};
 
+/// Runs the application and exits with a non-zero status on error.
 fn main() {
     if let Err(err) = run_main() {
         eprintln!("{err}");
@@ -18,6 +21,7 @@ fn main() {
     }
 }
 
+/// Parses CLI options, initializes monitors, and starts the TUI.
 #[allow(unreachable_code)]
 fn run_main() -> Result<()> {
     let sleep_arg = args().nth(1).unwrap_or_else(|| "500".to_owned());

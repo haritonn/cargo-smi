@@ -1,3 +1,8 @@
+//! Application state and refresh orchestration.
+//!
+//! This module keeps UI-independent runtime state: selected GPU, cached metrics,
+//! refresh timing, and recoverable errors shown in the TUI.
+
 use crate::{
     error,
     gpu::{GpuDevice, GpuEntry, GpuMonitor},
@@ -8,6 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Runtime state shared by the TUI and monitoring code.
 pub struct AppState {
     gpus: HashMap<usize, GpuEntry>,
     gpu_order: Vec<usize>,
@@ -23,6 +29,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Creates application state from detected GPUs and monitor instances.
     pub fn new(
         gpus: Vec<GpuDevice>,
         gpu_monitor: GpuMonitor,
@@ -50,6 +57,7 @@ impl AppState {
         })
     }
 
+    /// Selects the next GPU, wrapping around at the end.
     pub fn select_next(&mut self) {
         if self.gpu_order.is_empty() {
             self.selected_pos = None;
@@ -62,6 +70,7 @@ impl AppState {
         });
     }
 
+    /// Selects the previous GPU, wrapping around at the beginning.
     pub fn select_prev(&mut self) {
         if self.gpu_order.is_empty() {
             self.selected_pos = None;
@@ -74,14 +83,17 @@ impl AppState {
         });
     }
 
+    /// Requests application shutdown.
     pub fn quit(&mut self) {
         self.should_quit = true;
     }
 
+    /// Returns whether the application should exit.
     pub fn should_quit(&self) -> bool {
         self.should_quit
     }
 
+    /// Returns the latest recoverable refresh error, if any.
     pub fn last_error(&self) -> Option<&str> {
         self.last_error.as_deref()
     }
@@ -97,6 +109,7 @@ impl AppState {
             .ok_or(error::CargoSmiError::NoGpuSelected)
     }
 
+    /// Returns a mutable entry for the currently selected GPU.
     #[allow(unused)]
     pub fn selected_gpu_mut(&mut self) -> error::Result<&mut GpuEntry> {
         let idx = self.selected_idx()?;
@@ -105,7 +118,7 @@ impl AppState {
             .ok_or(error::CargoSmiError::GpuNotFound { idx })
     }
 
-    /// Returns GpuEntry by specified in self idx.
+    /// Returns the entry for the currently selected GPU.
     pub fn selected_gpu(&self) -> error::Result<&GpuEntry> {
         let idx = self.selected_idx()?;
         self.gpus
@@ -113,6 +126,10 @@ impl AppState {
             .ok_or(error::CargoSmiError::GpuNotFound { idx })
     }
 
+    /// Refreshes metrics for the currently selected GPU.
+    ///
+    /// Errors are stored in `last_error` instead of being propagated so the UI
+    /// can keep running after transient NVML failures.
     pub fn refresh_selected(&mut self) {
         let refresh_result = self
             .selected_idx()
@@ -132,32 +149,39 @@ impl AppState {
         self.last_update = Instant::now();
     }
 
+    /// Refreshes cached system metrics.
     pub fn refresh_system(&mut self) {
         self.system_stats = Some(self.system_monitor.refresh());
     }
+    /// Returns latest cached system metrics.
     pub fn system_stats(&self) -> Option<&SystemStats> {
         self.system_stats.as_ref()
     }
 
+    /// Returns formatted CUDA and NVIDIA driver version string.
     pub fn cuda_version(&self) -> &str {
         &self.cuda_version
     }
 
+    /// Refreshes both selected GPU metrics and system metrics.
     pub fn refresh_all(&mut self) {
         self.refresh_selected();
         self.refresh_system();
     }
 
+    /// Returns whether the configured refresh interval has elapsed.
     pub fn should_refresh(&self) -> bool {
         self.last_update.elapsed() >= self.interval
     }
 
+    /// Returns GPU entries in stable display order.
     pub fn gpu_entries(&self) -> Vec<&GpuEntry> {
         self.gpu_order
             .iter()
             .filter_map(|idx| self.gpus.get(idx))
             .collect()
     }
+    /// Returns selected GPU position in display order.
     pub fn selected_pos(&self) -> Option<usize> {
         self.selected_pos
     }
