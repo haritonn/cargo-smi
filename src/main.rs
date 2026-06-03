@@ -20,8 +20,8 @@ fn main() {
 
 #[allow(unreachable_code)]
 fn run_main() -> Result<()> {
-    let sleep_arg = args().nth(1).unwrap_or_else(|| "1".to_owned());
-    let sleep_secs = sleep_arg
+    let sleep_arg = args().nth(1).unwrap_or_else(|| "500".to_owned());
+    let sleep_millis = sleep_arg
         .parse::<u64>()
         .map_err(|_| CargoSmiError::CliArg {
             arg: sleep_arg.clone(),
@@ -33,7 +33,7 @@ fn run_main() -> Result<()> {
         return Err(CargoSmiError::NoGpuFound);
     }
 
-    let mut state = AppState::new(gpus, gpu_monitor, Duration::from_secs(sleep_secs))?;
+    let mut state = AppState::new(gpus, gpu_monitor, Duration::from_millis(sleep_millis))?;
     crate::ui::run_tui(&mut state)?;
     Ok(())
 }

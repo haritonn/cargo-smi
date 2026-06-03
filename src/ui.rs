@@ -1,4 +1,4 @@
-use crate::{app::AppState, error::Result};
+use crate::{app::AppState, error::Result, gpu::GpuEntry};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -99,17 +99,8 @@ fn run_tui_loop(
                     .border_style(Style::default().fg(Color::Cyan)),
             );
             let body_text = match state.selected_gpu() {
-                Ok(entry) => {
-                    let stats = match &entry.stats {
-                        Some(stats) => stats.to_string(),
-                        None => "No stats yet".to_owned(),
-                    };
-                    format!(
-                        "GPU {}: {}\n\n{}",
-                        entry.device.idx, entry.device.name, stats
-                    )
-                }
-                Err(err) => format!("Error: {err}"),
+                Ok(entry) => gpu_text(entry),
+                Err(err) => format!("Error occured: {err}"),
             };
             let body = Paragraph::new(body_text).block(
                 Block::default()
@@ -147,25 +138,48 @@ fn run_tui_loop(
             frame.render_widget(footer, chunks[2]);
         })?;
 
-        if event::poll(Duration::from_millis(50))?
-            && let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => state.quit(),
-                KeyCode::Char('j') | KeyCode::Down => {
-                    state.select_next();
-                    state.refresh_all();
-                }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    state.select_prev();
-                    state.refresh_all();
-                }
-                KeyCode::Char('r') => {
-                    state.refresh_all();
+        if event::poll(Duration::from_millis(25))? {
+            let mut selection_delta = 0i32;
+            let mut force_refresh = false;
+
+            for _ in 0..100 {
+                let Event::Key(key) = event::read()? else {
+                    continue;
+                };
+
+                if key.kind != KeyEventKind::Press {
+                    continue;
                 }
 
-                _ => {}
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => state.quit(),
+                    KeyCode::Char('j') | KeyCode::Down => selection_delta += 1,
+                    KeyCode::Char('k') | KeyCode::Up => selection_delta -= 1,
+                    KeyCode::Char('r') => force_refresh = true,
+                    _ => {}
+                }
+
+                if !event::poll(Duration::from_millis(0))? {
+                    break;
+                }
+            }
+
+            match selection_delta.cmp(&0) {
+                std::cmp::Ordering::Greater => {
+                    for _ in 0..selection_delta {
+                        state.select_next();
+                    }
+                }
+                std::cmp::Ordering::Less => {
+                    for _ in 0..selection_delta.unsigned_abs() {
+                        state.select_prev();
+                    }
+                }
+                std::cmp::Ordering::Equal => {}
+            }
+
+            if force_refresh {
+                state.refresh_all();
             }
         }
 
@@ -201,5 +215,31 @@ fn system_text(state: &AppState) -> String {
         ));
     }
 
+    text
+}
+
+fn gpu_text(entry: &GpuEntry) -> String {
+    let mut text = format!("GPU {}: {}\n\n", entry.device.idx, entry.device.name);
+    let Some(stats) = &entry.stats else {
+        text.push_str("no stats yet :(");
+        return text;
+    };
+    text.push_str(&stats.to_string());
+    text.push_str(&format!(
+        "\n\n{:<8} {:>10}  {:<16} {}",
+        "PID", "MEM(MiB)", "KIND", "NAME"
+    ));
+
+    if stats.processes.is_empty() {
+        text.push_str("\nNo GPU processes");
+        return text;
+    }
+    for process in &stats.processes {
+        let memory = format!("{}", process.memory / 1024 / 1024);
+        text.push_str(&format!(
+            "\n{:<8} {:>10}  {:<16} {}",
+            process.pid, memory, process.kind, process.name
+        ));
+    }
     text
 }

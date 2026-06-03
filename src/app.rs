@@ -105,6 +105,7 @@ impl AppState {
             .ok_or(error::CargoSmiError::GpuNotFound { idx })
     }
 
+    /// Returns GpuEntry by specified in self idx.
     pub fn selected_gpu(&self) -> error::Result<&GpuEntry> {
         let idx = self.selected_idx()?;
         self.gpus
