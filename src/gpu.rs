@@ -6,7 +6,6 @@ use nvml_wrapper::{
 };
 use std::collections::VecDeque;
 use std::fmt::Display;
-use sysinfo::{Pid, System};
 
 // Types
 
@@ -67,7 +66,6 @@ pub enum GpuProcKind {
 /// Core monitoring structure.
 pub struct GpuMonitor {
     nvml: Nvml,
-    system: System,
 }
 
 // Constructors
@@ -89,7 +87,7 @@ impl GpuEntry {
     /// Updates statistics for the current `GpuEntry`.
     #[allow(unused)]
     pub fn refresh_stats(&mut self, gpu_monitor: &mut GpuMonitor) -> Result<()> {
-        self.stats = Some(gpu_monitor.get_info(self.device.idx)?);
+        self.stats = Some(gpu_monitor.get_info(self.device.idx, |_| "<unknown>".to_owned())?);
         Ok(())
     }
 }
@@ -138,7 +136,6 @@ impl GpuMonitor {
     pub fn new() -> Result<Self> {
         Ok(Self {
             nvml: Nvml::init()?,
-            system: System::new_all(),
         })
     }
 
@@ -169,7 +166,10 @@ impl GpuMonitor {
     }
 
     /// Returns GPU stats for the device at `idx`.
-    pub fn get_info(&mut self, idx: usize) -> Result<GpuStats> {
+    pub fn get_info<F>(&mut self, idx: usize, mut process_name: F) -> Result<GpuStats>
+    where
+        F: FnMut(u32) -> String,
+    {
         let (temperature, utilization, memory_used, memory_total) = {
             let device = self.nvml.device_by_index(idx as u32)?;
             let memory = device.memory_info()?;
@@ -182,7 +182,7 @@ impl GpuMonitor {
                 memory.total / 1024 / 1024,
             )
         };
-        let processes = self.get_gpu_processes(idx)?;
+        let processes = self.get_gpu_processes(idx, &mut process_name)?;
 
         Ok(GpuStats::new(
             temperature,
@@ -196,9 +196,15 @@ impl GpuMonitor {
     /// Returns GPU processes for the device at `idx`, deduplicated by PID.
     ///
     /// Uses `convert_gpu_process` as helper function.
-    pub fn get_gpu_processes(&mut self, idx: usize) -> Result<Vec<GpuProcessStats>> {
+    pub fn get_gpu_processes<F>(
+        &mut self,
+        idx: usize,
+        process_name: &mut F,
+    ) -> Result<Vec<GpuProcessStats>>
+    where
+        F: FnMut(u32) -> String,
+    {
         let device = self.nvml.device_by_index(idx as u32)?;
-        self.system.refresh_all();
 
         let compute = device.running_compute_processes()?;
         let graphics = device.running_graphics_processes()?;
@@ -209,12 +215,12 @@ impl GpuMonitor {
             processes.push(convert_gpu_process(
                 process,
                 GpuProcKind::Compute,
-                &self.system,
+                process_name,
             ));
         }
 
         for process in graphics {
-            let new_process = convert_gpu_process(process, GpuProcKind::Graphics, &self.system);
+            let new_process = convert_gpu_process(process, GpuProcKind::Graphics, process_name);
 
             if let Some(existing) = processes
                 .iter_mut()
@@ -233,19 +239,19 @@ impl GpuMonitor {
 }
 
 /// Converts `nvml_wrapper`'s `ProcessInfo` into `GpuProcessStats`.
-fn convert_gpu_process(
+fn convert_gpu_process<F>(
     process: ProcessInfo,
     kind: GpuProcKind,
-    system: &System,
-) -> GpuProcessStats {
+    process_name: &mut F,
+) -> GpuProcessStats
+where
+    F: FnMut(u32) -> String,
+{
     let memory = match process.used_gpu_memory {
         UsedGpuMemory::Used(bytes) => bytes,
         UsedGpuMemory::Unavailable => 0,
     };
-    let name = system
-        .process(Pid::from_u32(process.pid))
-        .map(|process| process.name().to_str().unwrap_or("<non-utf8>").to_owned())
-        .unwrap_or_else(|| "<unknown>".to_owned());
+    let name = process_name(process.pid);
 
     GpuProcessStats {
         pid: process.pid,

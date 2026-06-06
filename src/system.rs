@@ -4,7 +4,7 @@
 //! display in the TUI.
 
 use std::cmp::Ordering;
-use sysinfo::System;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 /// Snapshot of system-wide metrics.
 #[derive(Debug, Clone)]
@@ -47,21 +47,34 @@ pub struct SystemMonitor {
 impl SystemMonitor {
     /// Creates a system monitor that keeps at most `process_limit` processes.
     pub fn new(process_limit: usize) -> Self {
-        let mut system = System::new_all();
-        system.refresh_all();
-
-        Self {
-            system,
+        let mut monitor = Self {
+            system: System::new(),
             process_limit,
-        }
+        };
+        monitor.refresh();
+        monitor
+    }
+
+    /// Returns a cached process name, if the process is known to `sysinfo`.
+    pub fn process_name(&self, pid: u32) -> String {
+        self.system
+            .process(Pid::from_u32(pid))
+            .map(|process| process.name().to_str().unwrap_or("<non-utf8>").to_owned())
+            .unwrap_or_else(|| "<unknown>".to_owned())
     }
 
     /// Refreshes system data and returns a sorted metrics snapshot.
     pub fn refresh(&mut self) -> SystemStats {
-        // self.system.refresh_cpu_usage();
-        // self.system.refresh_memory();
-        // self.system.refresh_processes(ProcessesToUpdate::All, true);
-        self.system.refresh_all();
+        self.system.refresh_cpu_usage();
+        self.system.refresh_memory();
+        self.system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing()
+                .with_cpu()
+                .with_memory()
+                .without_tasks(),
+        );
 
         let mut processes: Vec<ProcessStats> = self
             .system

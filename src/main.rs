@@ -24,7 +24,7 @@ fn main() {
 /// Parses CLI options, initializes monitors, and starts the TUI.
 #[allow(unreachable_code)]
 fn run_main() -> Result<()> {
-    let sleep_arg = args().nth(1).unwrap_or_else(|| "500".to_owned());
+    let sleep_arg = args().nth(1).unwrap_or_else(|| "2000".to_owned());
     let sleep_millis = sleep_arg
         .parse::<u64>()
         .map_err(|_| CargoSmiError::CliArg {

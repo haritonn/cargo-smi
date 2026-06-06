@@ -133,9 +133,15 @@ impl AppState {
     /// Errors are stored in `last_error` instead of being propagated so the UI
     /// can keep running after transient NVML failures.
     pub fn refresh_selected(&mut self) {
-        let refresh_result = self
-            .selected_idx()
-            .and_then(|idx| self.gpu_monitor.get_info(idx).map(|stats| (idx, stats)));
+        let refresh_result = match self.selected_idx() {
+            Ok(idx) => {
+                let system_monitor = &self.system_monitor;
+                self.gpu_monitor
+                    .get_info(idx, |pid| system_monitor.process_name(pid))
+                    .map(|stats| (idx, stats))
+            }
+            Err(err) => Err(err),
+        };
 
         match refresh_result {
             Ok((idx, stats)) => {
@@ -172,13 +178,18 @@ impl AppState {
 
     /// Refreshes both selected GPU metrics and system metrics.
     pub fn refresh_all(&mut self) {
-        self.refresh_selected();
         self.refresh_system();
+        self.refresh_selected();
     }
 
     /// Returns whether the configured refresh interval has elapsed.
     pub fn should_refresh(&self) -> bool {
         self.last_update.elapsed() >= self.interval
+    }
+
+    /// Returns how long the UI can sleep before the next scheduled refresh.
+    pub fn time_until_next_refresh(&self) -> Duration {
+        self.interval.saturating_sub(self.last_update.elapsed())
     }
 
     /// Returns GPU entries in stable display order.

@@ -16,6 +16,8 @@ use std::{
     time::Duration,
 };
 
+const MAX_EVENTS_PER_TICK: usize = 100;
+
 pub fn run_tui(state: &mut AppState) -> Result<()> {
     enable_raw_mode()?;
 
@@ -39,148 +41,157 @@ fn run_tui_loop(
     state: &mut AppState,
 ) -> Result<()> {
     state.refresh_all();
+    let mut needs_redraw = true;
+
     loop {
         if state.should_refresh() {
             state.refresh_all();
+            needs_redraw = true;
         }
-        terminal.draw(|frame| {
-            let area = frame.area();
 
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(3),
-                    Constraint::Min(1),
-                    Constraint::Length(3),
-                ])
-                .split(area);
-            let header = Paragraph::new(format!(
-                "cargo-smi | CUDA version: {}",
-                state.cuda_version()
-            ))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Magenta)),
-            );
-            let body_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(30),
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(60),
-                ])
-                .split(chunks[1]);
-            let stats_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(10)])
-                .split(body_chunks[1]);
+        if needs_redraw {
+            terminal.draw(|frame| {
+                let area = frame.area();
 
-            let selected_pos = state.selected_pos();
-            let items: Vec<ListItem> = state
-                .gpu_entries()
-                .iter()
-                .enumerate()
-                .map(|(pos, entry)| {
-                    let item =
-                        ListItem::new(format!("{}: {}", entry.device.idx, entry.device.name));
-
-                    if Some(pos) == selected_pos {
-                        item.style(
-                            Style::default()
-                                .fg(Color::Black)
-                                .bg(Color::Cyan)
-                                .add_modifier(Modifier::BOLD),
-                        )
-                    } else {
-                        item
-                    }
-                })
-                .collect();
-
-            let gpu_list = List::new(items).block(
-                Block::default()
-                    .title("GPUs")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Cyan)),
-            );
-            let body_text = match state.selected_gpu() {
-                Ok(entry) => gpu_text(entry),
-                Err(err) => format!("Error occured: {err}"),
-            };
-            let body = Paragraph::new(body_text).block(
-                Block::default()
-                    .title("Stats")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Green)),
-            );
-
-            let temp_data: Vec<u64> = match state.selected_gpu() {
-                Ok(entry) => entry.util_history.iter().map(|x| *x as u64).collect(),
-                _ => Vec::new(),
-            };
-
-            let graph = Sparkline::default()
-                .block(
-                    Block::default()
-                        .title("GPU utilization, %")
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Yellow)),
-                )
-                .style(Style::default().fg(Color::Yellow))
-                .max(100)
-                .data(&temp_data);
-
-            let system = Paragraph::new(system_text(state)).block(
-                Block::default()
-                    .title("System")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Blue)),
-            );
-
-            let footer_text = match state.last_error() {
-                Some(err) => format!("q/Esc quit | j/↓ next | k/↑ prev | r refresh | Error: {err}"),
-                None => "q/Esc quit | j/↓ next | k/↑ prev | r refresh".to_owned(),
-            };
-            let footer_style = if state.last_error().is_some() {
-                Style::default().fg(Color::Red)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-            let footer = Paragraph::new(footer_text)
-                .alignment(Alignment::Center)
+                let chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Length(3),
+                        Constraint::Min(1),
+                        Constraint::Length(3),
+                    ])
+                    .split(area);
+                let header = Paragraph::new(format!(
+                    "cargo-smi | CUDA version: {}",
+                    state.cuda_version()
+                ))
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(footer_style),
+                        .border_style(Style::default().fg(Color::Magenta)),
+                );
+                let body_chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(30),
+                        Constraint::Percentage(40),
+                        Constraint::Percentage(60),
+                    ])
+                    .split(chunks[1]);
+                let stats_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Min(1), Constraint::Length(10)])
+                    .split(body_chunks[1]);
+
+                let selected_pos = state.selected_pos();
+                let items: Vec<ListItem> = state
+                    .gpu_entries()
+                    .iter()
+                    .enumerate()
+                    .map(|(pos, entry)| {
+                        let item =
+                            ListItem::new(format!("{}: {}", entry.device.idx, entry.device.name));
+
+                        if Some(pos) == selected_pos {
+                            item.style(
+                                Style::default()
+                                    .fg(Color::Black)
+                                    .bg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD),
+                            )
+                        } else {
+                            item
+                        }
+                    })
+                    .collect();
+
+                let gpu_list = List::new(items).block(
+                    Block::default()
+                        .title("GPUs")
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                );
+                let body_text = match state.selected_gpu() {
+                    Ok(entry) => gpu_text(entry),
+                    Err(err) => format!("Error occured: {err}"),
+                };
+                let body = Paragraph::new(body_text).block(
+                    Block::default()
+                        .title("Stats")
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Green)),
                 );
 
-            frame.render_widget(header, chunks[0]);
-            frame.render_widget(gpu_list, body_chunks[0]);
-            frame.render_widget(body, stats_chunks[0]);
-            frame.render_widget(graph, stats_chunks[1]);
-            frame.render_widget(system, body_chunks[2]);
-            frame.render_widget(footer, chunks[2]);
-        })?;
+                let temp_data: Vec<u64> = match state.selected_gpu() {
+                    Ok(entry) => entry.util_history.iter().map(|x| *x as u64).collect(),
+                    _ => Vec::new(),
+                };
 
-        if event::poll(Duration::from_millis(25))? {
+                let graph = Sparkline::default()
+                    .block(
+                        Block::default()
+                            .title("GPU utilization, %")
+                            .borders(Borders::ALL)
+                            .border_style(Style::default().fg(Color::Yellow)),
+                    )
+                    .style(Style::default().fg(Color::Yellow))
+                    .max(100)
+                    .data(&temp_data);
+
+                let system = Paragraph::new(system_text(state)).block(
+                    Block::default()
+                        .title("System")
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Blue)),
+                );
+
+                let footer_text = match state.last_error() {
+                    Some(err) => {
+                        format!("q/Esc quit | j/↓ next | k/↑ prev | r refresh | Error: {err}")
+                    }
+                    None => "q/Esc quit | j/↓ next | k/↑ prev | r refresh".to_owned(),
+                };
+                let footer_style = if state.last_error().is_some() {
+                    Style::default().fg(Color::Red)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
+                let footer = Paragraph::new(footer_text)
+                    .alignment(Alignment::Center)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_style(footer_style),
+                    );
+
+                frame.render_widget(header, chunks[0]);
+                frame.render_widget(gpu_list, body_chunks[0]);
+                frame.render_widget(body, stats_chunks[0]);
+                frame.render_widget(graph, stats_chunks[1]);
+                frame.render_widget(system, body_chunks[2]);
+                frame.render_widget(footer, chunks[2]);
+            })?;
+            needs_redraw = false;
+        }
+
+        if event::poll(state.time_until_next_refresh())? {
             let mut selection_delta = 0i32;
             let mut force_refresh = false;
 
-            for _ in 0..100 {
-                let Event::Key(key) = event::read()? else {
-                    continue;
-                };
-
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => state.quit(),
-                    KeyCode::Char('j') | KeyCode::Down => selection_delta += 1,
-                    KeyCode::Char('k') | KeyCode::Up => selection_delta -= 1,
-                    KeyCode::Char('r') => force_refresh = true,
+            for _ in 0..MAX_EVENTS_PER_TICK {
+                match event::read()? {
+                    Event::Key(key) => {
+                        if key.kind == KeyEventKind::Press {
+                            match key.code {
+                                KeyCode::Char('q') | KeyCode::Esc => state.quit(),
+                                KeyCode::Char('j') | KeyCode::Down => selection_delta += 1,
+                                KeyCode::Char('k') | KeyCode::Up => selection_delta -= 1,
+                                KeyCode::Char('r') => force_refresh = true,
+                                _ => {}
+                            }
+                        }
+                    }
+                    Event::Resize(_, _) => needs_redraw = true,
                     _ => {}
                 }
 
@@ -194,17 +205,20 @@ fn run_tui_loop(
                     for _ in 0..selection_delta {
                         state.select_next();
                     }
+                    needs_redraw = true;
                 }
                 std::cmp::Ordering::Less => {
                     for _ in 0..selection_delta.unsigned_abs() {
                         state.select_prev();
                     }
+                    needs_redraw = true;
                 }
                 std::cmp::Ordering::Equal => {}
             }
 
             if force_refresh {
                 state.refresh_all();
+                needs_redraw = true;
             }
         }
 
