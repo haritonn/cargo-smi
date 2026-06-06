@@ -7,9 +7,8 @@ use crossterm::{
 use ratatui::{
     Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    symbols,
     widgets::{Block, Borders, List, ListItem, Paragraph, Sparkline},
 };
 use std::{
@@ -74,7 +73,7 @@ fn run_tui_loop(
                 .split(chunks[1]);
             let stats_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(12)])
+                .constraints([Constraint::Min(1), Constraint::Length(10)])
                 .split(body_chunks[1]);
 
             let selected_pos = state.selected_pos();
@@ -148,11 +147,13 @@ fn run_tui_loop(
             } else {
                 Style::default().fg(Color::DarkGray)
             };
-            let footer = Paragraph::new(footer_text).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(footer_style),
-            );
+            let footer = Paragraph::new(footer_text)
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(footer_style),
+                );
 
             frame.render_widget(header, chunks[0]);
             frame.render_widget(gpu_list, body_chunks[0]);
@@ -262,7 +263,10 @@ fn gpu_text(entry: &GpuEntry) -> String {
         let memory = format!("{}", process.memory / 1024 / 1024);
         text.push_str(&format!(
             "\n{:<8} {:>10}  {:<16} {}",
-            process.pid, memory, process.kind, process.name
+            process.pid,
+            memory,
+            process.kind.to_string(),
+            process.name
         ));
     }
     text
