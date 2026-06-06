@@ -13,6 +13,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const UTIL_LIMIT: usize = 120;
+
 /// Runtime state shared by the TUI and monitoring code.
 pub struct AppState {
     gpus: HashMap<usize, GpuEntry>,
@@ -138,6 +140,11 @@ impl AppState {
         match refresh_result {
             Ok((idx, stats)) => {
                 if let Some(gpu) = self.gpus.get_mut(&idx) {
+                    let util = stats.utilization;
+                    gpu.util_history.push_back(util);
+                    if gpu.util_history.len() > UTIL_LIMIT {
+                        gpu.util_history.pop_front();
+                    }
                     gpu.stats = Some(stats);
                     self.last_error = None;
                 } else {

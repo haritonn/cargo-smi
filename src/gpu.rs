@@ -4,6 +4,7 @@ use nvml_wrapper::{
     enum_wrappers::device::TemperatureSensor, enums::device::UsedGpuMemory,
     struct_wrappers::device::ProcessInfo,
 };
+use std::collections::VecDeque;
 use std::fmt::Display;
 use sysinfo::{Pid, System};
 
@@ -22,7 +23,7 @@ pub struct GpuDevice {
 #[derive(Debug)]
 pub struct GpuStats {
     temperature: u32,
-    utilization: u32,
+    pub utilization: u32,
     memory_used: u64,
     memory_total: u64,
     /// Processes currently using this GPU.
@@ -34,6 +35,7 @@ pub struct GpuStats {
 pub struct GpuEntry {
     pub device: GpuDevice,
     pub stats: Option<GpuStats>,
+    pub util_history: VecDeque<u32>,
 }
 
 /// Statistics for a process using GPU resources.
@@ -80,6 +82,7 @@ impl GpuEntry {
         Self {
             device,
             stats: None,
+            util_history: VecDeque::new(),
         }
     }
 

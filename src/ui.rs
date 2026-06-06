@@ -9,7 +9,8 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    symbols,
+    widgets::{Block, Borders, List, ListItem, Paragraph, Sparkline},
 };
 use std::{
     io::{self, stdout},
@@ -71,6 +72,11 @@ fn run_tui_loop(
                     Constraint::Percentage(60),
                 ])
                 .split(chunks[1]);
+            let stats_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(12)])
+                .split(body_chunks[1]);
+
             let selected_pos = state.selected_pos();
             let items: Vec<ListItem> = state
                 .gpu_entries()
@@ -92,6 +98,7 @@ fn run_tui_loop(
                     }
                 })
                 .collect();
+
             let gpu_list = List::new(items).block(
                 Block::default()
                     .title("GPUs")
@@ -108,6 +115,22 @@ fn run_tui_loop(
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Green)),
             );
+
+            let temp_data: Vec<u64> = match state.selected_gpu() {
+                Ok(entry) => entry.util_history.iter().map(|x| *x as u64).collect(),
+                _ => Vec::new(),
+            };
+
+            let graph = Sparkline::default()
+                .block(
+                    Block::default()
+                        .title("GPU utilization, %")
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow)),
+                )
+                .style(Style::default().fg(Color::Yellow))
+                .max(100)
+                .data(&temp_data);
 
             let system = Paragraph::new(system_text(state)).block(
                 Block::default()
@@ -133,7 +156,8 @@ fn run_tui_loop(
 
             frame.render_widget(header, chunks[0]);
             frame.render_widget(gpu_list, body_chunks[0]);
-            frame.render_widget(body, body_chunks[1]);
+            frame.render_widget(body, stats_chunks[0]);
+            frame.render_widget(graph, stats_chunks[1]);
             frame.render_widget(system, body_chunks[2]);
             frame.render_widget(footer, chunks[2]);
         })?;
