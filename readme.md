@@ -1,52 +1,46 @@
 # cargo-smi
 
 <p align="center">
-  <img src="assets/app.png" alt="cargo-smi TUI dashboard" width="900">
+  <img src="assets/app.png" alt="Терминальная панель мониторинга cargo-smi" width="900">
 </p>
 
 <p align="center">
-  <strong>A fast terminal dashboard for NVIDIA GPU and system monitoring.</strong>
+  <strong>Быстрая терминальная панель для мониторинга GPU NVIDIA и основных показателей системы.</strong>
 </p>
 
 ---
 
-`cargo-smi` is a lightweight TUI monitor that shows NVIDIA GPU metrics, GPU processes, and basic system information in one terminal dashboard.
+`cargo-smi` — лёгкое TUI-приложение, которое собирает показатели GPU NVIDIA, процессы, использующие GPU, и сведения о системе в одном терминальном окне.
+## Возможности
 
-Unlike shelling out to `nvidia-smi`, GPU data is collected directly through NVIDIA Management Library using [`nvml-wrapper`](https://docs.rs/nvml-wrapper), avoiding command output parsing.
+- выбор GPU, если в системе их несколько;
+- текущие показатели выбранного GPU:
+  - температура;
+  - загрузка GPU;
+  - использованная и общая видеопамять;
+  - график загрузки за последние 120 обновлений;
+- список процессов, использующих выбранный GPU:
+  - PID;
+  - имя процесса;
+  - занятая видеопамять;
+  - тип процесса: вычислительный, графический или оба;
+- версия CUDA, поддерживаемая драйвером, и версия драйвера NVIDIA;
+- показатели системы:
+  - общая загрузка CPU;
+  - использование RAM и swap;
+  - до 20 процессов с наибольшей загрузкой CPU;
+- обновление данных по таймеру или вручную;
+- управление с клавиатуры и настраиваемый интервал обновления в миллисекундах.
 
-## Features
+## Требования
 
-- Direct NVIDIA GPU detection via NVML
-- Live GPU stats:
-  - temperature
-  - utilization
-  - memory usage
-- GPU process list:
-  - PID
-  - process name
-  - used GPU memory
-  - compute / graphics process kind
-- Multiple GPU navigation
-- CUDA driver version and NVIDIA driver version display
-- System overview:
-  - CPU usage
-  - RAM usage
-  - swap usage
-  - top processes by CPU usage
-- Keyboard-driven terminal UI
-- Configurable refresh interval in milliseconds
+- Rust и Cargo;
+- GPU NVIDIA;
+- установленный драйвер NVIDIA с доступной NVML.
 
-## Requirements
+В большинстве Linux-дистрибутивов с проприетарным драйвером NVIDIA библиотека NVML доступна как `libnvidia-ml.so`.
 
-- Rust
-- NVIDIA GPU
-- NVIDIA driver with NVML available
-
-On most Linux systems with the proprietary NVIDIA driver installed, NVML is available as `libnvidia-ml.so`.
-
-## Installation
-
-Clone and build from source:
+## Установка
 
 ```bash
 git clone https://github.com/haritonn/cargo-smi
@@ -54,41 +48,53 @@ cd cargo-smi
 cargo build --release
 ```
 
-Run from source:
-
 ```bash
 cargo run --release
 ```
 
-Install locally with Cargo:
+Локальная установка через Cargo:
 
 ```bash
 cargo install --path .
 ```
 
-Then run:
+После установки приложение доступно как:
 
 ```bash
 cargo_smi
 ```
 
-## Usage
+## Использование
 
-Run with default refresh interval:
+По умолчанию данные обновляются каждые 2000 мс:
 
 ```bash
 cargo run --release
 ```
 
-Run with a custom refresh interval in milliseconds:
+Первый позиционный аргумент задаёт интервал обновления в миллисекундах:
 
 ```bash
 cargo run --release -- 500
 ```
 
-## Known limitations
+При установленном приложении аргумент передаётся так же:
 
-- NVIDIA-only for now
-- Requires NVIDIA driver / NVML
-- GPU process utilization percentage is not shown
-- First CPU readings may need one refresh cycle to stabilize
+```bash
+cargo_smi 500
+```
+
+## Управление
+
+| Клавиша | Действие |
+| --- | --- |
+| `q` или `Esc` | Выйти |
+| `j` или `↓` | Выбрать следующий GPU |
+| `k` или `↑` | Выбрать предыдущий GPU |
+| `r` | Немедленно обновить все показатели |
+
+## Ограничения
+
+- Поддерживаются только GPU NVIDIA и драйверы с NVML.
+- Загрузка отдельных процессов GPU в процентах не отображается.
+- Первым измерениям CPU может потребоваться один цикл обновления для стабилизации.
