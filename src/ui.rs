@@ -236,8 +236,12 @@ fn system_text(state: &AppState) -> String {
     };
 
     let mut text = format!(
-        "CPU: {:.1}%\nRAM: {} / {} MiB\nSWAP: {} / {} MiB\n\nPID      CPU     MEM(MiB) NAME",
+        "CPU: {:.1}%, {}\nRAM: {} / {} MiB\nSWAP: {} / {} MiB\n\nPID      CPU     MEM(MiB) NAME",
         stats.cpu_usage,
+        match stats.cpu_temp {
+            Some(temp) => format!("{temp}°C"),
+            None => format!("N/A"),
+        },
         stats.memory_used / 1024 / 1024,
         stats.memory_total / 1024 / 1024,
         stats.swap_used / 1024 / 1024,
