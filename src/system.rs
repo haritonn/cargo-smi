@@ -4,13 +4,18 @@
 //! display in the TUI.
 
 use std::cmp::Ordering;
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::{Components, Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 /// Snapshot of system-wide metrics.
 #[derive(Debug, Clone)]
 pub struct SystemStats {
     /// Global CPU usage as reported by `sysinfo`, in percent.
     pub cpu_usage: f32,
+    /// CPU temperature in Celcius.
+    ///
+    /// This can be not available due to hardware issues,
+    /// lack of permissions or something else.
+    pub cpu_temp: Option<f32>,
     /// Used RAM in bytes.
     pub memory_used: u64,
     /// Total RAM in bytes.
@@ -38,9 +43,35 @@ pub struct ProcessStats {
     pub memory: u64,
 }
 
+/// Picks the CPU package/die temperature out of the sensor list if possible.
+///
+/// There is no single "CPU temperature" sensor exposed by the OS, so this
+/// matches on the label conventions used by the common Linux `hwmon`
+/// drivers.
+///
+/// Intel uses `package id 0` label, AMD uses `tctl` and `tdie`.
+fn cpu_temperature(components: &Components) -> Option<f32> {
+    let labels: &[&str] = &["package id 0", "tctl", "tdie"];
+
+    for label in labels {
+        if let Some(temp) = components.iter().find_map(|c| {
+            c.label()
+                .to_lowercase()
+                .contains(label)
+                .then(|| c.temperature())
+                .flatten()
+        }) {
+            return Some(temp);
+        }
+    }
+
+    None
+}
+
 /// Stateful system monitor backed by `sysinfo::System`.
 pub struct SystemMonitor {
     system: System,
+    components: Components,
     process_limit: usize,
 }
 
@@ -49,6 +80,7 @@ impl SystemMonitor {
     pub fn new(process_limit: usize) -> Self {
         let mut monitor = Self {
             system: System::new(),
+            components: Components::new_with_refreshed_list(),
             process_limit,
         };
         monitor.refresh();
@@ -67,6 +99,7 @@ impl SystemMonitor {
     pub fn refresh(&mut self) -> SystemStats {
         self.system.refresh_cpu_usage();
         self.system.refresh_memory();
+        self.components.refresh(false);
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
@@ -99,6 +132,7 @@ impl SystemMonitor {
 
         SystemStats {
             cpu_usage: self.system.global_cpu_usage(),
+            cpu_temp: cpu_temperature(&self.components),
             memory_used: self.system.used_memory(),
             memory_total: self.system.total_memory(),
             swap_used: self.system.used_swap(),
